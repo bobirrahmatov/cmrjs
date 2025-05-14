@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Dashboard Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="cmr.js"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <h1 class="text-2xl font-bold mb-4">CSV Dashboard Generator</h1>
+    <button id="showGuidelines" class="mb-4 bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300">Show Chart Guidelines</button>
+    <div id="guidelines" class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded text-sm text-blue-900 hidden">
+      <h2 class="font-semibold mb-2">Chart Type Data Format Guidelines</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><b>Line, Area, Bar, Scatter:</b> Each selected field should be a column of numbers.<br>Example:<br><code>Date,Sales,Profit<br>Jan,100,20<br>Feb,120,25</code></li>
+        <li><b>Candlestick:</b> Needs 4 columns: Open, High, Low, Close (optionally Date/Category as first column).<br>Example:<br><code>Date,Open,High,Low,Close<br>Jan,10,15,8,12</code></li>
+        <li><b>Box Plot:</b> Needs 5 columns: Minimum, Q1, Median, Q3, Maximum.<br>Example:<br><code>Category,Min,Q1,Median,Q3,Max<br>A,1,2,3,4,5</code></li>
+        <li><b>Range Bar / Range Area:</b> Needs 2 columns per series: Start, End.<br>Example:<br><code>Category,Start,End<br>Task 1,1,5</code></li>
+        <li><b>Bubble:</b> Needs 3 columns per series: X, Y, Z (size).<br>Example:<br><code>X,Y,Z<br>1,2,10</code></li>
+        <li><b>Pie, Donut, Polar Area:</b> Needs 1 column for values, 1 for labels.<br>Example:<br><code>Label,Value<br>A,30</code></li>
+        <li><b>Heatmap:</b> Needs 3 columns: X, Y, Value.<br>Example:<br><code>X,Y,Value<br>A,1,10</code></li>
+        <li><b>Treemap:</b> Needs 2 columns: Label, Value.<br>Example:<br><code>Label,Value<br>A,10</code></li>
+        <li><b>Radar, RadialBar:</b> Each field is a series, each row is a category.</li>
+      </ul>
+    </div>
+    <div class="mb-2 text-xs text-red-600">If your chart is not rendering as expected, please check the chart guidelines above for the required CSV format.</div>
+    <div class="mb-4">
+      <label for="csvFile" class="block text-sm font-medium text-gray-700">Upload CSV File</label>
+      <input type="file" id="csvFile" accept=".csv" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+    </div>
+    <div class="mb-4">
+      <label for="fieldSelect" class="block text-sm font-medium text-gray-700">Select Fields for Chart</label>
+      <select id="fieldSelect" multiple class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+        <option value="">Select fields</option>
+      </select>
+    </div>
+    <div class="mb-4">
+      <label for="chartTypeSelect" class="block text-sm font-medium text-gray-700">Select Chart Type</label>
+      <select id="chartTypeSelect" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+        <option value="line">Line</option>
+        <option value="area">Area</option>
+        <option value="bar">Bar</option>
+        <option value="candlestick">Candlestick</option>
+        <option value="boxPlot">Box Plot</option>
+        <option value="rangeBar">Range Bar</option>
+        <option value="rangeArea">Range Area</option>
+        <option value="bubble">Bubble</option>
+        <option value="scatter">Scatter</option>
+        <option value="heatmap">Heatmap</option>
+        <option value="treemap">Treemap</option>
+        <option value="pie">Pie</option>
+        <option value="donut">Donut</option>
+        <option value="polarArea">Polar Area</option>
+        <option value="radar">Radar</option>
+        <option value="radialBar">Radial Bar</option>
+      </select>
+    </div>
+    <div class="mb-4 flex gap-4">
+      <div>
+        <label for="chartHeight" class="block text-sm font-medium text-gray-700">Chart Height</label>
+        <input type="number" id="chartHeight" value="350" class="mt-1 block w-24 border border-gray-300 rounded-md shadow-sm p-2">
+      </div>
+      <div>
+        <label for="chartWidth" class="block text-sm font-medium text-gray-700">Chart Width</label>
+        <input type="number" id="chartWidth" value="800" class="mt-1 block w-24 border border-gray-300 rounded-md shadow-sm p-2">
+      </div>
+    </div>
+    <button id="generateChart" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Generate Chart</button>
+    <div id="chartContainer" class="mt-6 bg-white p-4 rounded-lg shadow-sm"></div>
+  </div>
+
+  <script>
+    document.getElementById('csvFile').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const csvData = e.target.result;
+          const lines = csvData.split('\n');
+          const headers = lines[0].split(',');
+          const fieldSelect = document.getElementById('fieldSelect');
+          fieldSelect.innerHTML = '';
+          headers.forEach(header => {
+            const option = document.createElement('option');
+            option.value = header.trim();
+            option.textContent = header.trim();
+            fieldSelect.appendChild(option);
+          });
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    document.getElementById('generateChart').addEventListener('click', function() {
+      const file = document.getElementById('csvFile').files[0];
+      const selectedFields = Array.from(document.getElementById('fieldSelect').selectedOptions).map(option => option.value);
+      const chartType = document.getElementById('chartTypeSelect').value;
+      const chartHeight = document.getElementById('chartHeight').value;
+      const chartWidth = document.getElementById('chartWidth').value;
+      
+      if (!file || selectedFields.length === 0) {
+        alert('Please upload a CSV file and select at least one field.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const csvData = e.target.result;
+        const lines = csvData.split('\n');
+        const headers = lines[0].split(',');
+        const series = selectedFields.map(field => {
+          const fieldIndex = headers.indexOf(field);
+          if (fieldIndex === -1) {
+            alert('Selected field not found in CSV: ' + field);
+            return null;
+          }
+          const data = [];
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            if (values[fieldIndex]) {
+              data.push(parseFloat(values[fieldIndex]));
+            }
+          }
+          return { name: field, data: data };
+        }).filter(series => series !== null);
+
+        const chartOptions = {
+          series: series,
+          chart: {
+            type: chartType,
+            height: parseInt(chartHeight),
+            width: parseInt(chartWidth),
+            toolbar: {
+              show: true,
+              tools: {
+                download: true,
+                selection: true,
+                zoom: true,
+                zoomin: true,
+                zoomout: true,
+                pan: true,
+                reset: true
+              }
+            },
+            background: '#ffffff',
+            animations: {
+              enabled: false
+            }
+          },
+          grid: {
+            show: true,
+            borderColor: '#f1f1f1',
+            strokeDashArray: 0,
+            position: 'back',
+            xaxis: {
+              lines: {
+                show: true
+              }
+            },
+            yaxis: {
+              lines: {
+                show: true
+              }
+            }
+          },
+          theme: {
+            mode: 'light',
+            palette: 'palette1'
+          },
+          title: {
+            text: 'Chart for Selected Fields',
+            align: 'left',
+            style: {
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#263238'
+            }
+          },
+          xaxis: {
+            labels: {
+              style: {
+                colors: '#666',
+                fontSize: '12px'
+              }
+            }
+          },
+          yaxis: {
+            labels: {
+              style: {
+                colors: '#666',
+                fontSize: '12px'
+              }
+            }
+          },
+          tooltip: {
+            enabled: true,
+            shared: true,
+            intersect: false
+          },
+          legend: {
+            position: 'top',
+            horizontalAlign: 'right',
+            offsetY: -10
+          }
+        };
+
+        const chartContainer = document.querySelector("#chartContainer");
+        chartContainer.innerHTML = ''; // Clear previous chart
+        const chart = new CmrCharts(chartContainer, chartOptions);
+        chart.render();
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('showGuidelines').addEventListener('click', function() {
+      const guidelines = document.getElementById('guidelines');
+      if (guidelines.classList.contains('hidden')) {
+        guidelines.classList.remove('hidden');
+        this.textContent = 'Hide Chart Guidelines';
+      } else {
+        guidelines.classList.add('hidden');
+        this.textContent = 'Show Chart Guidelines';
+      }
+    });
+  </script>
+</body>
+</html> 
